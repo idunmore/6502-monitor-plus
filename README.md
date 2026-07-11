@@ -1,2 +1,16 @@
 # 6502-monitor-plus
+
 Updated version of Ben Eater's Arduino 6502 monitor, adding 65C02 OpCode decoding
+
+[![Static Badge](https://img.shields.io/badge/Arduino-00878F?logo=arduino&logoColor=fff&label=Arduino%20Mega%202560&link=https://store-usa.arduino.cc/products/arduino-mega-2560-rev3)](https://store-usa.arduino.cc/products/arduino-mega-2560-rev3/)&nbsp;[![CC BY 4.0][cc-by-shield]][cc-by]
+
+
+
+## License
+This work is licensed under a [Creative Commons Attribution 4.0 International License][cc-by].
+
+[![CC BY 4.0][cc-by-image]][cc-by]
+
+[cc-by]: https://creativecommons.org/licenses/by/4.0/
+[cc-by-image]: https://licensebuttons.net/l/by/4.0/88x31.png
+[cc-by-shield]: https://img.shields.io/badge/License-CC%20BY%204.0-orange.svg
