@@ -4,6 +4,9 @@ Extended version of [Ben Eater](https://eater.net)'s [Arduino 6502 monitor](http
 
 [![Static Badge](https://img.shields.io/badge/Arduino-00878F?logo=arduino&logoColor=fff&label=Arduino%20Mega%202560&link=https://store-usa.arduino.cc/products/arduino-mega-2560-rev3)](https://store-usa.arduino.cc/products/arduino-mega-2560-rev3/)&nbsp;[![CC BY 4.0][cc-by-shield]][cc-by]
 
+![MonitorOutput](6502-monitor-plus-output.png)
+
+The output above is the first few clock steps (after the 6502's seven-cycle reset sequence) of output from using 6502-monitor-plus with a BE6502 running WozMon.
 
 ## Attribution
 
