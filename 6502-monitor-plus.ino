@@ -109,7 +109,7 @@ void replaceToken(char *buf, size_t bufSize, const char *token, const char *repl
 // once all of an instruction's operand bytes have been captured. `pc` is the address the
 // opcode itself was fetched from, needed to resolve relative-branch targets.
 //
-// Decoded instruction syntax is the effectively a dissassembly, and is output using normal
+// Decoded instruction syntax is the effectively a disassembly, and is output using normal
 // 6502 assembly-style instructions and operands.
 void formatDecoded(char *out, size_t outSize, const char *text, uint8_t *operand, unsigned int pc) {
   char buf[20];
