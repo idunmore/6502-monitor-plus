@@ -1,7 +1,8 @@
 // Extended version of Ben Eater's (https://eater.net) "6502-monitor.ino" sketch.
 //
 // Adds opcode/instruction mnemonic, and addressing mode, when CPU is reading an OPCODE
-// (as indicated by the W65C02S's SYNC pin being HIGH).
+// (as indicated by the W65C02S's SYNC pin being HIGH). Fully decodes multi-byte instructions
+// appending the resolved instruction (e.g. "JSR $1234") to the end of the line once decoded.
 
 // This work, "6502-monitor_plus" is an extension to "6502-monitor.ino", by Ben Eater,
 // used under CC BY 4.0.  "6502-monitor_plus" is, similarly, licensed under CC BY 4.0
@@ -66,6 +67,85 @@ const char OPCODES[256][12] PROGMEM = {
   "SED",      "SBC abs,Y",   "PLX",       "???",       "???",          "SBC abs,X",  "INC abs,X",  "BBS7 zp,rel"   // F8
 };
 
+// State for the deferred, full-instruction decode: carried across clock cycles while an
+// instruction's operand bytes are being collected, so the fully-resolved instruction (e.g.
+// "JSR $1234") can be appended to the line once the last operand byte has been read.
+
+uint8_t decode_pending = 0;    // operand bytes still to be read for the in-flight instruction
+uint8_t decode_have = 0;       // operand bytes already read for the in-flight instruction
+uint8_t decode_operand[2];     // operand bytes, in the order they were fetched (low byte first)
+unsigned int decode_pc = 0;    // address bus value when the in-flight opcode was fetched
+char decode_text[12];          // the in-flight opcode's mnemonic/addressing-mode text
+
+// Determine how many operand bytes follow an opcode, based on its addressing-mode text
+// (e.g. "... abs" -> 2, "... zp" -> 1, "" -> 0). BBRx/BBSx use "zp,rel" and need both
+// bytes, so that check has to happen before the plain "zp" check.
+uint8_t operandByteCount(const char *text) {
+  if (strstr(text, "zp,rel")) return 2;
+  if (strstr(text, "abs"))    return 2;
+  if (strstr(text, "zp"))     return 1;
+  if (strstr(text, "#"))      return 1;
+  if (strstr(text, "rel"))    return 1;
+  return 0;
+}
+
+// Replace the first occurrence of `token` in `buf` (capacity `bufSize`) with `replacement`,
+// shifting the remainder of the string to make room.
+void replaceToken(char *buf, size_t bufSize, const char *token, const char *replacement) {
+  char *pos = strstr(buf, token);
+  if (!pos) return;
+
+  size_t tokenLen = strlen(token);
+  size_t replLen = strlen(replacement);
+  size_t tailLen = strlen(pos + tokenLen);
+
+  if ((size_t)(pos - buf) + replLen + tailLen + 1 > bufSize) return;
+
+  memmove(pos + replLen, pos + tokenLen, tailLen + 1);
+  memcpy(pos, replacement, replLen);
+}
+
+// Build the fully-decoded instruction (e.g. "JSR $1234", "ORA ($12,X)", "BBR0 $12,$3456")
+// once all of an instruction's operand bytes have been captured. `pc` is the address the
+// opcode itself was fetched from, needed to resolve relative-branch targets.
+//
+// Decoded instruction syntax is the effectively a dissassembly, and is output using normal
+// 6502 assembly-style instructions and operands.
+void formatDecoded(char *out, size_t outSize, const char *text, uint8_t *operand, unsigned int pc) {
+  char buf[20];
+  strncpy(buf, text, sizeof(buf) - 1);
+  buf[sizeof(buf) - 1] = '\0';
+
+  char value[8];
+
+  if (strstr(buf, "zp,rel")) {
+    // BBRx/BBSx: zero-page address to test, then a relative branch offset.
+    sprintf(value, "$%02X", operand[0]);
+    replaceToken(buf, sizeof(buf), "zp", value);
+
+    unsigned int target = pc + 3 + (int8_t)operand[1];
+    sprintf(value, "$%04X", target);
+    replaceToken(buf, sizeof(buf), "rel", value);
+  } else if (strstr(buf, "abs")) {
+    unsigned int addr = operand[0] | (operand[1] << 8);
+    sprintf(value, "$%04X", addr);
+    replaceToken(buf, sizeof(buf), "abs", value);
+  } else if (strstr(buf, "zp")) {
+    sprintf(value, "$%02X", operand[0]);
+    replaceToken(buf, sizeof(buf), "zp", value);
+  } else if (strstr(buf, "#")) {
+    sprintf(value, "#$%02X", operand[0]);
+    replaceToken(buf, sizeof(buf), "#", value);
+  } else if (strstr(buf, "rel")) {
+    unsigned int target = pc + 2 + (int8_t)operand[0];
+    sprintf(value, "$%04X", target);
+    replaceToken(buf, sizeof(buf), "rel", value);
+  }
+
+  snprintf(out, outSize, "%s", buf);
+}
+
+
 // Setup the Arduino for monitoring ...
 void setup() {
   // Address pins 
@@ -91,8 +171,10 @@ void setup() {
 
 // Interrupt handler, so we only run on a clock pulse
 void onClock() {
-  char output[32];
+  char output[64];
   char mnemonic[12];
+  char decoded[20];
+  decoded[0] = '\0';
 
   // Read the address, and send a binary version to the serial output
   unsigned int address = 0;
@@ -116,12 +198,42 @@ void onClock() {
   // data or an address, etc.); get the OPCODE when appropriate or "---" if not.
   if (digitalRead(SYNC)) {
     memcpy_P(mnemonic, OPCODES[data], sizeof(mnemonic));  
+
+    // Start (or restart) tracking this instruction's operand bytes, if it has any.
+    decode_pending = operandByteCount(mnemonic);
+    decode_have = 0;
+    decode_pc = address;
+    strcpy(decode_text, mnemonic);
+
+    // Implied/accumulator instructions (e.g. NOP, INY) take no operand bytes, so
+    // there's nothing to wait for — the "decoded" instruction is the mnemonic
+    // itself, and it's appended right away on this same line.
+    if (decode_pending == 0) {
+      formatDecoded(decoded, sizeof(decoded), decode_text, decode_operand, decode_pc);
+    }    
   } else {
     strcpy(mnemonic, "---");
+
+    // Collect this instruction's operand bytes as they go by; once the last one
+    // arrives, resolve the full instruction so it can be appended to this line.
+    if (decode_pending > 0) {
+      decode_operand[decode_have] = (uint8_t)data;
+      decode_have += 1;
+      decode_pending -= 1;
+
+      if (decode_pending == 0) {
+        formatDecoded(decoded, sizeof(decoded), decode_text, decode_operand, decode_pc);
+      }
+    }
   }
 
-  // Format and output the current address, data, R/W flag and opcode
-  sprintf(output, "   %04x  %c %02x  %s", address, digitalRead(READ_WRITE) ? 'r' : 'W', data, mnemonic);
+  // Format and output the current address, data, R/W flag and opcode, plus the
+  // fully-decoded instruction, if one just completed on this line.
+  sprintf(output, "   %04x  %c %02x  %-12s", address, digitalRead(READ_WRITE) ? 'r' : 'W', data, mnemonic);
+  if (decoded[0]) {
+    strcat(output, "  ");
+    strcat(output, decoded);
+  }
   Serial.println(output);
 }
 
