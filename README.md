@@ -1,12 +1,34 @@
 # 6502-monitor-plus
 
-Extended version of [Ben Eater](https://eater.net)'s [Arduino 6502 monitor](https://eater.net/downloads/6502-monitor.ino) sketch, adding 65C02 OpCode decoding
-
 [![Static Badge](https://img.shields.io/badge/Arduino-00878F?logo=arduino&logoColor=fff&label=Arduino%20Mega%202560&link=https://store-usa.arduino.cc/products/arduino-mega-2560-rev3)](https://store-usa.arduino.cc/products/arduino-mega-2560-rev3/)&nbsp;[![CC BY 4.0][cc-by-shield]][cc-by]
+
+Extended version of [Ben Eater](https://eater.net)'s [Arduino 6502 monitor](https://eater.net/downloads/6502-monitor.ino) sketch, adding 65C02 OpCode decoding, including full 6502 *assembly-style* output of decoded multi-byte instructions.
 
 ![MonitorOutput](6502-monitor-plus-output.png)
 
-The output above is the first few clock steps (after the 6502's seven-cycle reset sequence) of output from using 6502-monitor-plus with a BE6502 running WozMon.
+The output above is the first few clock steps (after the 6502's seven-cycle reset sequence) of output from a simple assembly language program:
+
+````
+	.org $8000
+
+reset:
+
+	lda #$ff
+	ldx #$00
+loop:
+	sta $6000
+	sbc #$01
+	bne loop
+
+	jmp ($fff8)
+
+	.org $fff8
+	.word reset
+	.org $fffa
+	.word
+	.word reset
+	.word
+````
 
 ## Attribution
 
