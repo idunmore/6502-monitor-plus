@@ -39,7 +39,7 @@ const char OPCODES[256][12] PROGMEM = {
   "JSR abs",  "AND (zp,X)",  "???",       "???",       "BIT zp",       "AND zp",     "ROL zp",     "RMB2 zp",      // 20
   "PLP",      "AND #",       "ROL",       "???",       "BIT abs",      "AND abs",    "ROL abs",    "BBR2 rel",     // 28
   "BMI rel",  "AND (zp),Y",  "AND (zp)",  "???",       "BIT zp,X",     "AND zp,X",   "ROL zp,X",   "RMB3 zp",      // 30
-  "SEC",      "AND abs,Y",   "DEC",       "???",       "BIT abs,X",    "AND abs,X",  "ROL abs,X",  "BBR3 el",      // 38
+  "SEC",      "AND abs,Y",   "DEC",       "???",       "BIT abs,X",    "AND abs,X",  "ROL abs,X",  "BBR3 rel",     // 38
   "RTI",      "EOR (zp,X)",  "???",       "???",       "???",          "EOR zp",     "LSR zp",     "RMB4 zp",      // 40
   "PHA",      "EOR #",       "LSR",       "???",       "JMP abs",      "EOR abs",    "LSR abs",    "BBR4 rel",     // 48
   "BVC rel",  "EOR (zp),Y",  "EOR (zp)",  "???",       "???",          "EOR zp,X",   "LSR zp,X",   "RMB5 zp",      // 50
