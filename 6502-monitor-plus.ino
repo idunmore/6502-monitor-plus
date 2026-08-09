@@ -29,41 +29,41 @@ const char DATA[] = {39, 41, 43, 45, 47, 49, 51, 53};
 //
 // Addressing mode notation:
 //
-//   zp = zero page | abs = absolute | # = immediate | () = indirect | , X or ,Y indexed
+//   zp = zero page | abs = absolute | # = immediate | () = indirect | rel = relative | ,X or ,Y indexed
 //   (zp,X) = zero page indexed indirect | (zp),Y = zero page indirect, indexed 
 const char OPCODES[256][12] PROGMEM = {
   "BRK",      "ORA (zp,X)",  "???",       "???",       "TSB zp",       "ORA zp",     "ASL zp",     "RMB0 zp",      // 00
-  "PHP",      "ORA #",       "ASL",       "???",       "TSB abs",      "ORA abs",    "ASL abs",    "BBR0 rel",     // 08
+  "PHP",      "ORA #",       "ASL",       "???",       "TSB abs",      "ORA abs",    "ASL abs",    "BBR0 zp,rel",  // 08
   "BPL rel",  "ORA (zp),Y",  "ORA (zp)",  "???",       "TRB zp",       "ORA zp,X",   "ASL zp,X",   "RMB1 zp",      // 10
-  "CLC",      "ORA abs,Y",   "INC",       "???",       "TRB abs",      "ORA abs,X",  "ASL abs,X",  "BBR1 rel",     // 18
+  "CLC",      "ORA abs,Y",   "INC",       "???",       "TRB abs",      "ORA abs,X",  "ASL abs,X",  "BBR1 zp,rel",  // 18
   "JSR abs",  "AND (zp,X)",  "???",       "???",       "BIT zp",       "AND zp",     "ROL zp",     "RMB2 zp",      // 20
-  "PLP",      "AND #",       "ROL",       "???",       "BIT abs",      "AND abs",    "ROL abs",    "BBR2 rel",     // 28
+  "PLP",      "AND #",       "ROL",       "???",       "BIT abs",      "AND abs",    "ROL abs",    "BBR2 zp,rel",  // 28
   "BMI rel",  "AND (zp),Y",  "AND (zp)",  "???",       "BIT zp,X",     "AND zp,X",   "ROL zp,X",   "RMB3 zp",      // 30
-  "SEC",      "AND abs,Y",   "DEC",       "???",       "BIT abs,X",    "AND abs,X",  "ROL abs,X",  "BBR3 rel",     // 38
+  "SEC",      "AND abs,Y",   "DEC",       "???",       "BIT abs,X",    "AND abs,X",  "ROL abs,X",  "BBR3 zp,rel",  // 38
   "RTI",      "EOR (zp,X)",  "???",       "???",       "???",          "EOR zp",     "LSR zp",     "RMB4 zp",      // 40
-  "PHA",      "EOR #",       "LSR",       "???",       "JMP abs",      "EOR abs",    "LSR abs",    "BBR4 rel",     // 48
+  "PHA",      "EOR #",       "LSR",       "???",       "JMP abs",      "EOR abs",    "LSR abs",    "BBR4 zp,rel",  // 48
   "BVC rel",  "EOR (zp),Y",  "EOR (zp)",  "???",       "???",          "EOR zp,X",   "LSR zp,X",   "RMB5 zp",      // 50
-  "CLI",      "EOR abs,Y",   "PHY",       "???",       "???",          "EOR abs,X",  "LSR abs,X",  "BBR5 rel",     // 58
+  "CLI",      "EOR abs,Y",   "PHY",       "???",       "???",          "EOR abs,X",  "LSR abs,X",  "BBR5 zp,rel",  // 58
   "RTS",      "ADC (zp,X)",  "???",       "???",       "STZ zp",       "ADC zp",     "ROR zp",     "RMB6 zp",      // 60
-  "PLA",      "ADC #",       "ROR",       "???",       "JMP (abs)",    "ADC abs",    "ROR abs",    "BBR6 rel",     // 68
+  "PLA",      "ADC #",       "ROR",       "???",       "JMP (abs)",    "ADC abs",    "ROR abs",    "BBR6 zp,rel",  // 68
   "BVS rel",  "ADC (zp),Y",  "ADC (zp)",  "???",       "STZ zp,x",     "ADC zp,X",   "ROR zp,X",   "RMB7 zp",      // 70
-  "SEI",      "ADC abs,Y",   "PLY",       "???",       "JMP (abs,X)",  "ADC abs,X",  "ROR abs,X",  "BBR7 rel",     // 78
+  "SEI",      "ADC abs,Y",   "PLY",       "???",       "JMP (abs,X)",  "ADC abs,X",  "ROR abs,X",  "BBR7 zp,rel",  // 78
   "BRA rel",  "STA (zp,X)",  "???",       "???",       "STY zp",       "STA zp",     "STX zp",     "SMB0 zp",      // 80
-  "DEY",      "BIT #",       "TXA",       "???",       "STY abs",      "STA abs",    "STX abs",    "BBS0 rel",     // 88
+  "DEY",      "BIT #",       "TXA",       "???",       "STY abs",      "STA abs",    "STX abs",    "BBS0 zp,rel",  // 88
   "BCC rel",  "STA (zp),Y",  "STA (zp)",  "???",       "STY zp,X",     "STA zp,X",   "STX zp,Y",   "SMB1 zp",      // 90
-  "TYA",      "STA abs,Y",   "TXS",       "???",       "STZ abs",      "STA abs,X",  "STX abs,X",  "BBS1 rel",     // 98
+  "TYA",      "STA abs,Y",   "TXS",       "???",       "STZ abs",      "STA abs,X",  "STX abs,X",  "BBS1 zp,rel",  // 98
   "LDY #",    "LDA (zp,X)",  "LDX #",     "???",       "LDY zp",       "LDA zp",     "LDX zp",     "SMB2 zp",      // A0
-  "TAY",      "LDA #",       "TAX",       "???",       "LDY abs",      "LDA abs",    "LDX abs",    "BBS2 rel",     // A8
-  "BCS",      "LDA (zp),Y",  "LDA (zp)",  "???",       "LDY zp,X",     "LDA zp,X",   "LDX zp,Y",   "SMB3 zp",      // B0
-  "CLV",      "LDA abs,Y",   "TSX",       "???",       "LDY abs,X",    "LDA abs,X",  "LDX abs,Y",  "BBS3 rel",     // B8
+  "TAY",      "LDA #",       "TAX",       "???",       "LDY abs",      "LDA abs",    "LDX abs",    "BBS2 zp,rel",  // A8
+  "BCS rel",  "LDA (zp),Y",  "LDA (zp)",  "???",       "LDY zp,X",     "LDA zp,X",   "LDX zp,Y",   "SMB3 zp",      // B0
+  "CLV",      "LDA abs,Y",   "TSX",       "???",       "LDY abs,X",    "LDA abs,X",  "LDX abs,Y",  "BBS3 zp,rel",  // B8
   "CPY #",    "CMP (zp,X)",  "???",       "???",       "CPY zp",       "CMP zp",     "DEC zp",     "SMB4 zp",      // C0
-  "INY",      "CMP #",       "DEX",       "WAI",       "CPY abs",      "CMP abs",    "DEC abs",    "BBS4 rel",     // C8
+  "INY",      "CMP #",       "DEX",       "WAI",       "CPY abs",      "CMP abs",    "DEC abs",    "BBS4 zp,rel",  // C8
   "BNE rel",  "CMP (zp),Y",  "CMP (zp)",  "???",       "???",          "CMP zp,X",   "DEC zp,X",   "SMB5 zp",      // D0
-  "CLD",      "CMP abs,Y",   "PHX",       "STP",       "???",          "CMP abs,X",  "DEC abs,X",  "BBS5 rel",     // D8
+  "CLD",      "CMP abs,Y",   "PHX",       "STP",       "???",          "CMP abs,X",  "DEC abs,X",  "BBS5 zp,rel",  // D8
   "CPX #",    "SBC (zp,X)",  "???",       "???",       "CPX zp",       "SBC zp",     "INC zp",     "SMB6 zp",      // E0
-  "INX",      "SBC #",       "NOP",       "???",       "CPX abs",      "SBC abs",    "INC abs",    "BBS6 rel",     // E8
-  "BEQ",      "SBC (zp),Y",  "SBC (zp)",  "???",       "???",          "SBC zp,X",   "INC zp,X",   "SMB7 zp",      // F0
-  "SED",      "SBC abs,Y",   "PLX",       "???",       "???",          "SBC abs,X",  "INC abs,X",  "BBS7 rel"      // F8
+  "INX",      "SBC #",       "NOP",       "???",       "CPX abs",      "SBC abs",    "INC abs",    "BBS6 zp,rel",  // E8
+  "BEQ rel",  "SBC (zp),Y",  "SBC (zp)",  "???",       "???",          "SBC zp,X",   "INC zp,X",   "SMB7 zp",      // F0
+  "SED",      "SBC abs,Y",   "PLX",       "???",       "???",          "SBC abs,X",  "INC abs,X",  "BBS7 zp,rel"   // F8
 };
 
 // Setup the Arduino for monitoring ...
