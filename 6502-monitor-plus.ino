@@ -25,130 +25,292 @@ const char DATA[] = {39, 41, 43, 45, 47, 49, 51, 53};
 #define READ_WRITE 3  // W65C02S pin 34
 #define SYNC 4        // W65C02S pin 7
 
-// W65C02S opcode table in flash ("PROGMEM") — 256 × 12 bytes = 3072 bytes of flash,
-// rather than in SRAM; indexed directly by the data (OPCODE) byte.
+// ---------------------------------------------------------------------------------------
+// Instruction set description
 //
-// Addressing mode notation:
-//
-//   zp = zero page | abs = absolute | # = immediate | () = indirect | rel = relative | ,X or ,Y indexed
-//   (zp,X) = zero page indexed indirect | (zp),Y = zero page indirect, indexed 
-const char OPCODES[256][12] PROGMEM = {
-  "BRK",      "ORA (zp,X)",  "???",       "???",       "TSB zp",       "ORA zp",     "ASL zp",     "RMB0 zp",      // 00
-  "PHP",      "ORA #",       "ASL",       "???",       "TSB abs",      "ORA abs",    "ASL abs",    "BBR0 zp,rel",  // 08
-  "BPL rel",  "ORA (zp),Y",  "ORA (zp)",  "???",       "TRB zp",       "ORA zp,X",   "ASL zp,X",   "RMB1 zp",      // 10
-  "CLC",      "ORA abs,Y",   "INC",       "???",       "TRB abs",      "ORA abs,X",  "ASL abs,X",  "BBR1 zp,rel",  // 18
-  "JSR abs",  "AND (zp,X)",  "???",       "???",       "BIT zp",       "AND zp",     "ROL zp",     "RMB2 zp",      // 20
-  "PLP",      "AND #",       "ROL",       "???",       "BIT abs",      "AND abs",    "ROL abs",    "BBR2 zp,rel",  // 28
-  "BMI rel",  "AND (zp),Y",  "AND (zp)",  "???",       "BIT zp,X",     "AND zp,X",   "ROL zp,X",   "RMB3 zp",      // 30
-  "SEC",      "AND abs,Y",   "DEC",       "???",       "BIT abs,X",    "AND abs,X",  "ROL abs,X",  "BBR3 zp,rel",  // 38
-  "RTI",      "EOR (zp,X)",  "???",       "???",       "???",          "EOR zp",     "LSR zp",     "RMB4 zp",      // 40
-  "PHA",      "EOR #",       "LSR",       "???",       "JMP abs",      "EOR abs",    "LSR abs",    "BBR4 zp,rel",  // 48
-  "BVC rel",  "EOR (zp),Y",  "EOR (zp)",  "???",       "???",          "EOR zp,X",   "LSR zp,X",   "RMB5 zp",      // 50
-  "CLI",      "EOR abs,Y",   "PHY",       "???",       "???",          "EOR abs,X",  "LSR abs,X",  "BBR5 zp,rel",  // 58
-  "RTS",      "ADC (zp,X)",  "???",       "???",       "STZ zp",       "ADC zp",     "ROR zp",     "RMB6 zp",      // 60
-  "PLA",      "ADC #",       "ROR",       "???",       "JMP (abs)",    "ADC abs",    "ROR abs",    "BBR6 zp,rel",  // 68
-  "BVS rel",  "ADC (zp),Y",  "ADC (zp)",  "???",       "STZ zp,X",     "ADC zp,X",   "ROR zp,X",   "RMB7 zp",      // 70
-  "SEI",      "ADC abs,Y",   "PLY",       "???",       "JMP (abs,X)",  "ADC abs,X",  "ROR abs,X",  "BBR7 zp,rel",  // 78
-  "BRA rel",  "STA (zp,X)",  "???",       "???",       "STY zp",       "STA zp",     "STX zp",     "SMB0 zp",      // 80
-  "DEY",      "BIT #",       "TXA",       "???",       "STY abs",      "STA abs",    "STX abs",    "BBS0 zp,rel",  // 88
-  "BCC rel",  "STA (zp),Y",  "STA (zp)",  "???",       "STY zp,X",     "STA zp,X",   "STX zp,Y",   "SMB1 zp",      // 90
-  "TYA",      "STA abs,Y",   "TXS",       "???",       "STZ abs",      "STA abs,X",  "STZ abs,X",  "BBS1 zp,rel",  // 98
-  "LDY #",    "LDA (zp,X)",  "LDX #",     "???",       "LDY zp",       "LDA zp",     "LDX zp",     "SMB2 zp",      // A0
-  "TAY",      "LDA #",       "TAX",       "???",       "LDY abs",      "LDA abs",    "LDX abs",    "BBS2 zp,rel",  // A8
-  "BCS rel",  "LDA (zp),Y",  "LDA (zp)",  "???",       "LDY zp,X",     "LDA zp,X",   "LDX zp,Y",   "SMB3 zp",      // B0
-  "CLV",      "LDA abs,Y",   "TSX",       "???",       "LDY abs,X",    "LDA abs,X",  "LDX abs,Y",  "BBS3 zp,rel",  // B8
-  "CPY #",    "CMP (zp,X)",  "???",       "???",       "CPY zp",       "CMP zp",     "DEC zp",     "SMB4 zp",      // C0
-  "INY",      "CMP #",       "DEX",       "WAI",       "CPY abs",      "CMP abs",    "DEC abs",    "BBS4 zp,rel",  // C8
-  "BNE rel",  "CMP (zp),Y",  "CMP (zp)",  "???",       "???",          "CMP zp,X",   "DEC zp,X",   "SMB5 zp",      // D0
-  "CLD",      "CMP abs,Y",   "PHX",       "STP",       "???",          "CMP abs,X",  "DEC abs,X",  "BBS5 zp,rel",  // D8
-  "CPX #",    "SBC (zp,X)",  "???",       "???",       "CPX zp",       "SBC zp",     "INC zp",     "SMB6 zp",      // E0
-  "INX",      "SBC #",       "NOP",       "???",       "CPX abs",      "SBC abs",    "INC abs",    "BBS6 zp,rel",  // E8
-  "BEQ rel",  "SBC (zp),Y",  "SBC (zp)",  "???",       "???",          "SBC zp,X",   "INC zp,X",   "SMB7 zp",      // F0
-  "SED",      "SBC abs,Y",   "PLX",       "???",       "???",          "SBC abs,X",  "INC abs,X",  "BBS7 zp,rel"   // F8
+// Each opcode is described as an (operation, addressing mode) pair rather than as a single
+// display string. The display text is built from the pair on demand, and the same pair
+// drives operand-length calculation and instruction formatting — so there is exactly one
+// place that knows what any given opcode is.
+// ---------------------------------------------------------------------------------------
+
+// Operations. Values are indices into MNEMONICS[], so the two MUST stay in the same order
+enum Operation : uint8_t {
+  OP_ADC,  OP_AND,  OP_ASL,
+  OP_BBR0, OP_BBR1, OP_BBR2, OP_BBR3, OP_BBR4, OP_BBR5, OP_BBR6, OP_BBR7,
+  OP_BBS0, OP_BBS1, OP_BBS2, OP_BBS3, OP_BBS4, OP_BBS5, OP_BBS6, OP_BBS7,
+  OP_BCC,  OP_BCS,  OP_BEQ,  OP_BIT,  OP_BMI,  OP_BNE,  OP_BPL,  OP_BRA,
+  OP_BRK,  OP_BVC,  OP_BVS,
+  OP_CLC,  OP_CLD,  OP_CLI,  OP_CLV,  OP_CMP,  OP_CPX,  OP_CPY,
+  OP_DEC,  OP_DEX,  OP_DEY,
+  OP_EOR,
+  OP_INC,  OP_INX,  OP_INY,
+  OP_JMP,  OP_JSR,
+  OP_LDA,  OP_LDX,  OP_LDY,  OP_LSR,
+  OP_NOP,
+  OP_ORA,
+  OP_PHA,  OP_PHP,  OP_PHX,  OP_PHY,  OP_PLA,  OP_PLP,  OP_PLX,  OP_PLY,
+  OP_RMB0, OP_RMB1, OP_RMB2, OP_RMB3, OP_RMB4, OP_RMB5, OP_RMB6, OP_RMB7,
+  OP_ROL,  OP_ROR,  OP_RTI,  OP_RTS,
+  OP_SBC,  OP_SEC,  OP_SED,  OP_SEI,
+  OP_SMB0, OP_SMB1, OP_SMB2, OP_SMB3, OP_SMB4, OP_SMB5, OP_SMB6, OP_SMB7,
+  OP_STA,  OP_STP,  OP_STX,  OP_STY,  OP_STZ,
+  OP_TAX,  OP_TAY,  OP_TRB,  OP_TSB,  OP_TSX,  OP_TXA,  OP_TXS,  OP_TYA,
+  OP_WAI,
+  OP_UNK,           // Undefined/unimplemented opcode
+  OPERATION_COUNT   
 };
+
+// Mnemonic text, indexed by Operation. Order MUST match Operation enum above
+const char MNEMONICS[][5] PROGMEM = {
+  "ADC",  "AND",  "ASL",
+  "BBR0", "BBR1", "BBR2", "BBR3", "BBR4", "BBR5", "BBR6", "BBR7",
+  "BBS0", "BBS1", "BBS2", "BBS3", "BBS4", "BBS5", "BBS6", "BBS7",
+  "BCC",  "BCS",  "BEQ",  "BIT",  "BMI",  "BNE",  "BPL",  "BRA",
+  "BRK",  "BVC",  "BVS",
+  "CLC",  "CLD",  "CLI",  "CLV",  "CMP",  "CPX",  "CPY",
+  "DEC",  "DEX",  "DEY",
+  "EOR",
+  "INC",  "INX",  "INY",
+  "JMP",  "JSR",
+  "LDA",  "LDX",  "LDY",  "LSR",
+  "NOP",
+  "ORA",
+  "PHA",  "PHP",  "PHX",  "PHY",  "PLA",  "PLP",  "PLX",  "PLY",
+  "RMB0", "RMB1", "RMB2", "RMB3", "RMB4", "RMB5", "RMB6", "RMB7",
+  "ROL",  "ROR",  "RTI",  "RTS",
+  "SBC",  "SEC",  "SED",  "SEI",
+  "SMB0", "SMB1", "SMB2", "SMB3", "SMB4", "SMB5", "SMB6", "SMB7",
+  "STA",  "STP",  "STX",  "STY",  "STZ",
+  "TAX",  "TAY",  "TRB",  "TSB",  "TSX",  "TXA",  "TXS",  "TYA",
+  "WAI",
+  "???"
+};
+
+// Make sure the number of mnemonics matches the number of operations
+static_assert(sizeof(MNEMONICS) / sizeof(MNEMONICS[0]) == OPERATION_COUNT,
+              "MNEMONICS[] and the Operation enum are out of step");
+
+// Addressing modes. Values are indices into MODE_SUFFIX[] and MODE_OPERAND_BYTES[], so all
+// *three* MUST stay in the same order.
+//
+// IMP and ACC render identically (bare mnemonic) but are kept distinct: the emulator needs
+// to tell "ASL A" from "ASL $1234".
+enum AddressMode : uint8_t {
+  MODE_IMP,       // Implied            e.g., NOP, CLC, RTS
+  MODE_ACC,       // Accumulator        e.g., ASL A, INC A
+  MODE_IMM,       // Immediate          #
+  MODE_ZP,        // Zero page          zp
+  MODE_ZPX,       // Zero page,X        zp,X
+  MODE_ZPY,       // Zero page,Y        zp,Y
+  MODE_ZPI,       // Zero page indirect (zp)
+  MODE_IZX,       // Indexed indirect   (zp,X)
+  MODE_IZY,       // Indirect indexed   (zp),Y
+  MODE_ABS,       // Absolute           abs
+  MODE_ABX,       // Absolute,X         abs,X
+  MODE_ABY,       // Absolute,Y         abs,Y
+  MODE_IND,       // Indirect           (abs)
+  MODE_IAX,       // Indexed indirect   (abs,X)
+  MODE_REL,       // Relative branch    rel
+  MODE_ZPR,       // Zero page + branch zp,rel
+  MODE_NONE,      // Undefined opcode
+  ADDRESS_MODE_COUNT
+};
+
+// Addressing-mode text appended after the mnemonic. Order MUST match the AddressMode enum above
+const char MODE_SUFFIX[][8] PROGMEM = {
+  "",         // MODE_IMP
+  "",         // MODE_ACC
+  "#",        // MODE_IMM
+  "zp",       // MODE_ZP
+  "zp,X",     // MODE_ZPX
+  "zp,Y",     // MODE_ZPY
+  "(zp)",     // MODE_ZPI
+  "(zp,X)",   // MODE_IZX
+  "(zp),Y",   // MODE_IZY
+  "abs",      // MODE_ABS
+  "abs,X",    // MODE_ABX
+  "abs,Y",    // MODE_ABY
+  "(abs)",    // MODE_IND
+  "(abs,X)",  // MODE_IAX
+  "rel",      // MODE_REL
+  "zp,rel",   // MODE_ZPR
+  ""          // MODE_NONE
+};
+
+// Make sure the number of addressing-mode suffixes matches the number of AddressMode entries
+static_assert(sizeof(MODE_SUFFIX) / sizeof(MODE_SUFFIX[0]) == ADDRESS_MODE_COUNT,
+              "MODE_SUFFIX[] and the AddressMode enum are out of step");
+
+// Operand bytes that follow the opcode, per addressing mode. Order MUST match the AddressMode enum
+//
+// MODE_NONE is 0: so undefined opcodes are treated as single-byte (which is what the
+// monitor has always assumed).  On real silicon their lengths vary (most are 1 byte, but
+// e.g. $02 is 2 and $5C is 3), so a run of them will de-synchronize the operand tracking.
+const uint8_t MODE_OPERAND_BYTES[] PROGMEM = {
+  0,  // MODE_IMP
+  0,  // MODE_ACC
+  1,  // MODE_IMM
+  1,  // MODE_ZP
+  1,  // MODE_ZPX
+  1,  // MODE_ZPY
+  1,  // MODE_ZPI
+  1,  // MODE_IZX
+  1,  // MODE_IZY
+  2,  // MODE_ABS
+  2,  // MODE_ABX
+  2,  // MODE_ABY
+  2,  // MODE_IND
+  2,  // MODE_IAX
+  1,  // MODE_REL
+  2,  // MODE_ZPR
+  0   // MODE_NONE
+};
+
+// Make sure the number of operand-byte-lengths matches the number of AddressMode entries
+static_assert(sizeof(MODE_OPERAND_BYTES) / sizeof(MODE_OPERAND_BYTES[0]) == ADDRESS_MODE_COUNT,
+              "MODE_OPERAND_BYTES[] and the AddressMode enum are out of step");
+
+// One entry per opcode, holding the operation and its addressing mode
+struct OpcodeEntry {
+  uint8_t operation;
+  uint8_t mode;
+};
+
+#define OP(operation, mode) { OP_##operation, MODE_##mode }
+#define ___                 { OP_UNK, MODE_NONE }
+
+// W65C02S opcode table in flash ("PROGMEM"), indexed directly by the data (OPCODE) byte
+const OpcodeEntry OPCODES[256] PROGMEM = {
+  OP(BRK,IMP),  OP(ORA,IZX),  ___,          ___,          OP(TSB,ZP),   OP(ORA,ZP),   OP(ASL,ZP),   OP(RMB0,ZP),   // 00
+  OP(PHP,IMP),  OP(ORA,IMM),  OP(ASL,ACC),  ___,          OP(TSB,ABS),  OP(ORA,ABS),  OP(ASL,ABS),  OP(BBR0,ZPR),  // 08
+  OP(BPL,REL),  OP(ORA,IZY),  OP(ORA,ZPI),  ___,          OP(TRB,ZP),   OP(ORA,ZPX),  OP(ASL,ZPX),  OP(RMB1,ZP),   // 10
+  OP(CLC,IMP),  OP(ORA,ABY),  OP(INC,ACC),  ___,          OP(TRB,ABS),  OP(ORA,ABX),  OP(ASL,ABX),  OP(BBR1,ZPR),  // 18
+  OP(JSR,ABS),  OP(AND,IZX),  ___,          ___,          OP(BIT,ZP),   OP(AND,ZP),   OP(ROL,ZP),   OP(RMB2,ZP),   // 20
+  OP(PLP,IMP),  OP(AND,IMM),  OP(ROL,ACC),  ___,          OP(BIT,ABS),  OP(AND,ABS),  OP(ROL,ABS),  OP(BBR2,ZPR),  // 28
+  OP(BMI,REL),  OP(AND,IZY),  OP(AND,ZPI),  ___,          OP(BIT,ZPX),  OP(AND,ZPX),  OP(ROL,ZPX),  OP(RMB3,ZP),   // 30
+  OP(SEC,IMP),  OP(AND,ABY),  OP(DEC,ACC),  ___,          OP(BIT,ABX),  OP(AND,ABX),  OP(ROL,ABX),  OP(BBR3,ZPR),  // 38
+  OP(RTI,IMP),  OP(EOR,IZX),  ___,          ___,          ___,          OP(EOR,ZP),   OP(LSR,ZP),   OP(RMB4,ZP),   // 40
+  OP(PHA,IMP),  OP(EOR,IMM),  OP(LSR,ACC),  ___,          OP(JMP,ABS),  OP(EOR,ABS),  OP(LSR,ABS),  OP(BBR4,ZPR),  // 48
+  OP(BVC,REL),  OP(EOR,IZY),  OP(EOR,ZPI),  ___,          ___,          OP(EOR,ZPX),  OP(LSR,ZPX),  OP(RMB5,ZP),   // 50
+  OP(CLI,IMP),  OP(EOR,ABY),  OP(PHY,IMP),  ___,          ___,          OP(EOR,ABX),  OP(LSR,ABX),  OP(BBR5,ZPR),  // 58
+  OP(RTS,IMP),  OP(ADC,IZX),  ___,          ___,          OP(STZ,ZP),   OP(ADC,ZP),   OP(ROR,ZP),   OP(RMB6,ZP),   // 60
+  OP(PLA,IMP),  OP(ADC,IMM),  OP(ROR,ACC),  ___,          OP(JMP,IND),  OP(ADC,ABS),  OP(ROR,ABS),  OP(BBR6,ZPR),  // 68
+  OP(BVS,REL),  OP(ADC,IZY),  OP(ADC,ZPI),  ___,          OP(STZ,ZPX),  OP(ADC,ZPX),  OP(ROR,ZPX),  OP(RMB7,ZP),   // 70
+  OP(SEI,IMP),  OP(ADC,ABY),  OP(PLY,IMP),  ___,          OP(JMP,IAX),  OP(ADC,ABX),  OP(ROR,ABX),  OP(BBR7,ZPR),  // 78
+  OP(BRA,REL),  OP(STA,IZX),  ___,          ___,          OP(STY,ZP),   OP(STA,ZP),   OP(STX,ZP),   OP(SMB0,ZP),   // 80
+  OP(DEY,IMP),  OP(BIT,IMM),  OP(TXA,IMP),  ___,          OP(STY,ABS),  OP(STA,ABS),  OP(STX,ABS),  OP(BBS0,ZPR),  // 88
+  OP(BCC,REL),  OP(STA,IZY),  OP(STA,ZPI),  ___,          OP(STY,ZPX),  OP(STA,ZPX),  OP(STX,ZPY),  OP(SMB1,ZP),   // 90
+  OP(TYA,IMP),  OP(STA,ABY),  OP(TXS,IMP),  ___,          OP(STZ,ABS),  OP(STA,ABX),  OP(STZ,ABX),  OP(BBS1,ZPR),  // 98
+  OP(LDY,IMM),  OP(LDA,IZX),  OP(LDX,IMM),  ___,          OP(LDY,ZP),   OP(LDA,ZP),   OP(LDX,ZP),   OP(SMB2,ZP),   // A0
+  OP(TAY,IMP),  OP(LDA,IMM),  OP(TAX,IMP),  ___,          OP(LDY,ABS),  OP(LDA,ABS),  OP(LDX,ABS),  OP(BBS2,ZPR),  // A8
+  OP(BCS,REL),  OP(LDA,IZY),  OP(LDA,ZPI),  ___,          OP(LDY,ZPX),  OP(LDA,ZPX),  OP(LDX,ZPY),  OP(SMB3,ZP),   // B0
+  OP(CLV,IMP),  OP(LDA,ABY),  OP(TSX,IMP),  ___,          OP(LDY,ABX),  OP(LDA,ABX),  OP(LDX,ABY),  OP(BBS3,ZPR),  // B8
+  OP(CPY,IMM),  OP(CMP,IZX),  ___,          ___,          OP(CPY,ZP),   OP(CMP,ZP),   OP(DEC,ZP),   OP(SMB4,ZP),   // C0
+  OP(INY,IMP),  OP(CMP,IMM),  OP(DEX,IMP),  OP(WAI,IMP),  OP(CPY,ABS),  OP(CMP,ABS),  OP(DEC,ABS),  OP(BBS4,ZPR),  // C8
+  OP(BNE,REL),  OP(CMP,IZY),  OP(CMP,ZPI),  ___,          ___,          OP(CMP,ZPX),  OP(DEC,ZPX),  OP(SMB5,ZP),   // D0
+  OP(CLD,IMP),  OP(CMP,ABY),  OP(PHX,IMP),  OP(STP,IMP),  ___,          OP(CMP,ABX),  OP(DEC,ABX),  OP(BBS5,ZPR),  // D8
+  OP(CPX,IMM),  OP(SBC,IZX),  ___,          ___,          OP(CPX,ZP),   OP(SBC,ZP),   OP(INC,ZP),   OP(SMB6,ZP),   // E0
+  OP(INX,IMP),  OP(SBC,IMM),  OP(NOP,IMP),  ___,          OP(CPX,ABS),  OP(SBC,ABS),  OP(INC,ABS),  OP(BBS6,ZPR),  // E8
+  OP(BEQ,REL),  OP(SBC,IZY),  OP(SBC,ZPI),  ___,          ___,          OP(SBC,ZPX),  OP(INC,ZPX),  OP(SMB7,ZP),   // F0
+  OP(SED,IMP),  OP(SBC,ABY),  OP(PLX,IMP),  ___,          ___,          OP(SBC,ABX),  OP(INC,ABX),  OP(BBS7,ZPR)   // F8
+};
+
+#undef OP
+#undef ___
 
 // State for the deferred, full-instruction decode: carried across clock cycles while an
 // instruction's operand bytes are being collected, so the fully-resolved instruction (e.g.
 // "JSR $1234") can be appended to the line once the last operand byte has been read.
 
-uint8_t decode_pending = 0;    // operand bytes still to be read for the in-flight instruction
-uint8_t decode_have = 0;       // operand bytes already read for the in-flight instruction
-uint8_t decode_operand[2];     // operand bytes, in the order they were fetched (low byte first)
-unsigned int decode_pc = 0;    // address bus value when the in-flight opcode was fetched
-char decode_text[12];          // the in-flight opcode's mnemonic/addressing-mode text
+uint8_t decode_pending = 0;         // operand bytes still to be read for the in-flight instruction
+uint8_t decode_have = 0;            // operand bytes already read for the in-flight instruction
+uint8_t decode_operand[2];          // operand bytes, in the order they were fetched (low byte first)
+uint16_t decode_pc = 0;             // address bus value when the in-flight opcode was fetched
+uint8_t decode_operation = OP_UNK;  // the in-flight opcode's operation
+uint8_t decode_mode = MODE_NONE;    // the in-flight opcode's addressing mode
 
-// Determine how many operand bytes follow an opcode, based on its addressing-mode text
-// (e.g. "... abs" -> 2, "... zp" -> 1, "" -> 0). BBRx/BBSx use "zp,rel" and need both
-// bytes, so that check has to happen before the plain "zp" check.
-uint8_t operandByteCount(const char *text) {
-  if (strstr(text, "zp,rel")) return 2;
-  if (strstr(text, "abs"))    return 2;
-  if (strstr(text, "zp"))     return 1;
-  if (strstr(text, "#"))      return 1;
-  if (strstr(text, "rel"))    return 1;
-  return 0;
+// Look up an opcode byte's operation and addressing mode
+void lookupOpcode(uint8_t opcode, uint8_t *operation, uint8_t *mode) {
+  *operation = pgm_read_byte(&OPCODES[opcode].operation);
+  *mode = pgm_read_byte(&OPCODES[opcode].mode);
 }
 
-// Replace the first occurrence of `token` in `buf` (capacity `bufSize`) with `replacement`,
-// shifting the remainder of the string to make room.
-void replaceToken(char *buf, size_t bufSize, const char *token, const char *replacement) {
-  char *pos = strstr(buf, token);
-  if (!pos) return;
+// How many operand bytes follow an opcode in this addressing mode
+uint8_t operandByteCount(uint8_t mode) {
+  return pgm_read_byte(&MODE_OPERAND_BYTES[mode]);
+}
 
-  size_t tokenLen = strlen(token);
-  size_t replLen = strlen(replacement);
-  size_t tailLen = strlen(pos + tokenLen);
+// Build the mnemonic-plus-addressing-mode text shown as soon as an opcode is fetched
+// (e.g. "JSR abs", "ORA (zp,X)", "BBR0 zp,rel", "NOP", "???").
+void formatOpcode(char *out, size_t outSize, uint8_t operation, uint8_t mode) {
+  char mnemonic[sizeof(MNEMONICS[0])];
+  char suffix[sizeof(MODE_SUFFIX[0])];
 
-  if ((size_t)(pos - buf) + replLen + tailLen + 1 > bufSize) return;
+  strcpy_P(mnemonic, MNEMONICS[operation]);
+  strcpy_P(suffix, MODE_SUFFIX[mode]);
 
-  memmove(pos + replLen, pos + tokenLen, tailLen + 1);
-  memcpy(pos, replacement, replLen);
+  if (suffix[0]) {
+    snprintf(out, outSize, "%s %s", mnemonic, suffix);
+  } else {
+    snprintf(out, outSize, "%s", mnemonic);
+  }
 }
 
 // Build the fully-decoded instruction (e.g. "JSR $1234", "ORA ($12,X)", "BBR0 $12,$3456")
 // once all of an instruction's operand bytes have been captured. `pc` is the address the
-// opcode itself was fetched from, needed to resolve relative-branch targets.
+// opcode itself was fetched from (needed to resolve relative-branch targets).
 //
-// Decoded instruction syntax is the effectively a disassembly, and is output using normal
+// Decoded instruction syntax is effectively a disassembly, and is output using normal
 // 6502 assembly-style instructions and operands.
-void formatDecoded(char *out, size_t outSize, const char *text, uint8_t *operand, unsigned int pc) {
-  char buf[20];
-  strncpy(buf, text, sizeof(buf) - 1);
-  buf[sizeof(buf) - 1] = '\0';
+//
+// Addresses and branch targets are computed as uint16_t so they wrap at 64K exactly as the
+// CPU's program counter does (a backward branch from low memory wraps to the top of the
+// address space).
+void formatDecoded(char *out, size_t outSize, uint8_t operation, uint8_t mode,
+                   const uint8_t *operand, uint16_t pc) {
+  char mnemonic[sizeof(MNEMONICS[0])];
+  strcpy_P(mnemonic, MNEMONICS[operation]);
 
-  char value[8];
+  uint16_t addr = (uint16_t)operand[0] | ((uint16_t)operand[1] << 8);
 
-  if (strstr(buf, "zp,rel")) {
-    // BBRx/BBSx: zero-page address to test, then a relative branch offset.
-    sprintf(value, "$%02X", operand[0]);
-    replaceToken(buf, sizeof(buf), "zp", value);
+  switch (mode) {
+    case MODE_IMM: snprintf(out, outSize, "%s #$%02X",     mnemonic, operand[0]); break;
+    case MODE_ZP:  snprintf(out, outSize, "%s $%02X",      mnemonic, operand[0]); break;
+    case MODE_ZPX: snprintf(out, outSize, "%s $%02X,X",    mnemonic, operand[0]); break;
+    case MODE_ZPY: snprintf(out, outSize, "%s $%02X,Y",    mnemonic, operand[0]); break;
+    case MODE_ZPI: snprintf(out, outSize, "%s ($%02X)",    mnemonic, operand[0]); break;
+    case MODE_IZX: snprintf(out, outSize, "%s ($%02X,X)",  mnemonic, operand[0]); break;
+    case MODE_IZY: snprintf(out, outSize, "%s ($%02X),Y",  mnemonic, operand[0]); break;
+    case MODE_ABS: snprintf(out, outSize, "%s $%04X",      mnemonic, addr); break;
+    case MODE_ABX: snprintf(out, outSize, "%s $%04X,X",    mnemonic, addr); break;
+    case MODE_ABY: snprintf(out, outSize, "%s $%04X,Y",    mnemonic, addr); break;
+    case MODE_IND: snprintf(out, outSize, "%s ($%04X)",    mnemonic, addr); break;
+    case MODE_IAX: snprintf(out, outSize, "%s ($%04X,X)",  mnemonic, addr); break;
 
-    unsigned int target = pc + 3 + (int8_t)operand[1];
-    sprintf(value, "$%04X", target);
-    replaceToken(buf, sizeof(buf), "rel", value);
-  } else if (strstr(buf, "abs")) {
-    unsigned int addr = operand[0] | (operand[1] << 8);
-    sprintf(value, "$%04X", addr);
-    replaceToken(buf, sizeof(buf), "abs", value);
-  } else if (strstr(buf, "zp")) {
-    sprintf(value, "$%02X", operand[0]);
-    replaceToken(buf, sizeof(buf), "zp", value);
-  } else if (strstr(buf, "#")) {
-    sprintf(value, "#$%02X", operand[0]);
-    replaceToken(buf, sizeof(buf), "#", value);
-  } else if (strstr(buf, "rel")) {
-    unsigned int target = pc + 2 + (int8_t)operand[0];
-    sprintf(value, "$%04X", target);
-    replaceToken(buf, sizeof(buf), "rel", value);
+    // Branch targets are relative to the address of the *following* instruction, so the
+    // offset is added to the opcode's address plus the instruction's total length.
+    case MODE_REL:
+      snprintf(out, outSize, "%s $%04X", mnemonic,
+               (uint16_t)(pc + 2 + (int8_t)operand[0]));
+      break;
+
+    // BBRx/BBSx: zero-page address to test, then a relative branch offset
+    case MODE_ZPR:
+      snprintf(out, outSize, "%s $%02X,$%04X", mnemonic, operand[0],
+               (uint16_t)(pc + 3 + (int8_t)operand[1]));
+      break;
+
+    // Implied, accumulator and undefined opcodes have no operand to render
+    default:
+      snprintf(out, outSize, "%s", mnemonic);
+      break;
   }
-
-  snprintf(out, outSize, "%s", buf);
 }
-
 
 // Setup the Arduino for monitoring ...
 void setup() {
-  // Address pins 
+  // Address pins
   for (int n = 0; n < 16; n += 1) {
     pinMode(ADDR[n], INPUT);
   }
@@ -172,7 +334,7 @@ void setup() {
 // Interrupt handler, so we only run on a clock pulse
 void onClock() {
   char output[64];
-  char mnemonic[12];
+  char mnemonic[16];
   char decoded[20];
   decoded[0] = '\0';
 
@@ -197,20 +359,21 @@ void onClock() {
   // The 6502/W65C02S's SYNC pin is HIGH when reading an OPCODE (rather than
   // data or an address, etc.); get the OPCODE when appropriate or "---" if not.
   if (digitalRead(SYNC)) {
-    memcpy_P(mnemonic, OPCODES[data], sizeof(mnemonic));  
+    lookupOpcode((uint8_t)data, &decode_operation, &decode_mode);
+    formatOpcode(mnemonic, sizeof(mnemonic), decode_operation, decode_mode);
 
     // Start (or restart) tracking this instruction's operand bytes, if it has any.
-    decode_pending = operandByteCount(mnemonic);
+    decode_pending = operandByteCount(decode_mode);
     decode_have = 0;
     decode_pc = address;
-    strcpy(decode_text, mnemonic);
 
     // Implied/accumulator instructions (e.g. NOP, INY) take no operand bytes, so
     // there's nothing to wait for — the "decoded" instruction is the mnemonic
     // itself, and it's appended right away on this same line.
     if (decode_pending == 0) {
-      formatDecoded(decoded, sizeof(decoded), decode_text, decode_operand, decode_pc);
-    }    
+      formatDecoded(decoded, sizeof(decoded), decode_operation, decode_mode,
+                    decode_operand, decode_pc);
+    }
   } else {
     strcpy(mnemonic, "---");
 
@@ -222,7 +385,8 @@ void onClock() {
       decode_pending -= 1;
 
       if (decode_pending == 0) {
-        formatDecoded(decoded, sizeof(decoded), decode_text, decode_operand, decode_pc);
+        formatDecoded(decoded, sizeof(decoded), decode_operation, decode_mode,
+                      decode_operand, decode_pc);
       }
     }
   }
