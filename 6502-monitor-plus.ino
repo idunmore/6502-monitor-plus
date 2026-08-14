@@ -47,12 +47,12 @@ const char OPCODES[256][12] PROGMEM = {
   "CLI",      "EOR abs,Y",   "PHY",       "???",       "???",          "EOR abs,X",  "LSR abs,X",  "BBR5 zp,rel",  // 58
   "RTS",      "ADC (zp,X)",  "???",       "???",       "STZ zp",       "ADC zp",     "ROR zp",     "RMB6 zp",      // 60
   "PLA",      "ADC #",       "ROR",       "???",       "JMP (abs)",    "ADC abs",    "ROR abs",    "BBR6 zp,rel",  // 68
-  "BVS rel",  "ADC (zp),Y",  "ADC (zp)",  "???",       "STZ zp,x",     "ADC zp,X",   "ROR zp,X",   "RMB7 zp",      // 70
+  "BVS rel",  "ADC (zp),Y",  "ADC (zp)",  "???",       "STZ zp,X",     "ADC zp,X",   "ROR zp,X",   "RMB7 zp",      // 70
   "SEI",      "ADC abs,Y",   "PLY",       "???",       "JMP (abs,X)",  "ADC abs,X",  "ROR abs,X",  "BBR7 zp,rel",  // 78
   "BRA rel",  "STA (zp,X)",  "???",       "???",       "STY zp",       "STA zp",     "STX zp",     "SMB0 zp",      // 80
   "DEY",      "BIT #",       "TXA",       "???",       "STY abs",      "STA abs",    "STX abs",    "BBS0 zp,rel",  // 88
   "BCC rel",  "STA (zp),Y",  "STA (zp)",  "???",       "STY zp,X",     "STA zp,X",   "STX zp,Y",   "SMB1 zp",      // 90
-  "TYA",      "STA abs,Y",   "TXS",       "???",       "STZ abs",      "STA abs,X",  "STX abs,X",  "BBS1 zp,rel",  // 98
+  "TYA",      "STA abs,Y",   "TXS",       "???",       "STZ abs",      "STA abs,X",  "STZ abs,X",  "BBS1 zp,rel",  // 98
   "LDY #",    "LDA (zp,X)",  "LDX #",     "???",       "LDY zp",       "LDA zp",     "LDX zp",     "SMB2 zp",      // A0
   "TAY",      "LDA #",       "TAX",       "???",       "LDY abs",      "LDA abs",    "LDX abs",    "BBS2 zp,rel",  // A8
   "BCS rel",  "LDA (zp),Y",  "LDA (zp)",  "???",       "LDY zp,X",     "LDA zp,X",   "LDX zp,Y",   "SMB3 zp",      // B0
