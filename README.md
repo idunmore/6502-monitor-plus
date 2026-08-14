@@ -11,10 +11,13 @@ The output above is the first few clock steps (after the 6502's seven-cycle rese
 ````
 	.org $8000
 
-reset:
+init:
+	sec	
 
+reset:
 	lda #$ff
 	ldx #$00
+
 loop:
 	sta $6000
 	sbc #$01
@@ -26,7 +29,7 @@ loop:
 	.word reset
 	.org $fffa
 	.word
-	.word reset
+	.word init
 	.word
 ````
 
